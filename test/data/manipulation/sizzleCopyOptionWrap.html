@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+	<title>Bundled jQuery 1.9.1 (src/sizzle/test/jquery.js): &lt;option&gt; HTML isn't parsed inside a &lt;select&gt; wrapper (CVE-2020-11023)</title>
+	<script src="../../../src/sizzle/test/jquery.js"></script>
+</head>
+<body>
+	<script>
+		window.xss = function() {};
+
+		// Inside a <select multiple> wrapper the stray </select> closes the wrapper,
+		// so the rest of the markup is parsed outside of it and the raw-text
+		// <style>/<xmp> element no longer hides the <img>
+		var payloads = [
+				"<option><style></option></select><img src=url404 onerror=xss(1)></style>",
+				"<optgroup><style></optgroup></select><img src=url404 onerror=xss(2)></style>",
+				"<option><xmp></option></select><img src=url404 onerror=xss(3)></xmp>"
+			],
+			sibling = "<option>a</option></select><b>b</b>",
+			htmlImgs = [],
+			appendImgs = [],
+			nodes, i;
+
+		for ( i = 0; i < payloads.length; i++ ) {
+			htmlImgs.push( jQuery( "<div></div>" ).html( payloads[ i ] ).find( "img" ).length );
+			appendImgs.push( jQuery( "<div></div>" ).append( payloads[ i ] ).find( "img" ).length );
+		}
+
+		nodes = jQuery( sibling );
+
+		window.parent.iframeCallback({
+			version: jQuery.fn.jquery,
+			supportOption: jQuery.support.option,
+			topLevel: nodes.length,
+			topLevelNames: jQuery.map( nodes, function( node ) {
+				return node.nodeName.toLowerCase();
+			}).join( "," ),
+			parseHTML: jQuery.parseHTML( "<optgroup label='g'></optgroup></select><b>b</b>" ).length,
+			htmlChildren: jQuery( "<div></div>" ).html( sibling ).children().length,
+			appendChildren: jQuery( "<div></div>" ).append( sibling ).children().length,
+			htmlImgs: htmlImgs.join( "," ),
+			appendImgs: appendImgs.join( "," )
+		});
+	</script>
+</body>
+</html>
