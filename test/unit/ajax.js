@@ -60,6 +60,75 @@ module( "ajax", {
 		}
 	});
 
+	ajaxTest( "jQuery.ajax() - do not execute js (crossOrigin)", 2, {
+		create: function( options ) {
+			options.crossDomain = true;
+			return jQuery.ajax( url( "data/script.php?header=ecma" ), options );
+		},
+		success: function() {
+			ok( true, "success" );
+		},
+		complete: function() {
+			ok( true, "complete" );
+		}
+	});
+
+	ajaxTest( "jQuery.ajax() - do not execute js (crossOrigin, text/javascript)", 2, {
+		create: function( options ) {
+			options.crossDomain = true;
+			return jQuery.ajax( url( "data/script.php?header=javascript" ), options );
+		},
+		success: function() {
+			ok( true, "success" );
+		},
+		complete: function() {
+			ok( true, "complete" );
+		}
+	});
+
+	ajaxTest( "jQuery.ajax() - execute js for crossOrigin when dataType option is provided", 3, {
+		create: function( options ) {
+			options.crossDomain = true;
+			options.dataType = "script";
+			return jQuery.ajax( url( "data/script.php?header=ecma" ), options );
+		},
+		success: function() {
+			ok( true, "success" );
+		},
+		complete: function() {
+			ok( true, "complete" );
+		}
+	});
+
+	ajaxTest( "jQuery.ajax() - do not execute js (crossOrigin, default content type)", 2, {
+		create: function( options ) {
+			options.crossDomain = true;
+			return jQuery.ajax( url( "data/script.php" ), options );
+		},
+		success: function() {
+			ok( true, "success" );
+		},
+		complete: function() {
+			ok( true, "complete" );
+		}
+	});
+
+	// src/sizzle/test/jquery.js is a full jQuery 1.9.1 build shipped in the package
+	testIframeWithCallback( "jQuery.ajax() - do not execute js (crossOrigin) in the bundled jQuery 1.9.1 copy (src/sizzle/test/jquery.js)", "ajax/sizzleCopyCrossDomain.html", function( version, results ) {
+		expect( 10 );
+
+		equal( version, "1.9.1", "the iframe ran the bundled jQuery 1.9.1 copy" );
+		equal( results.crossDomain, "success, not executed", "cross-domain text/javascript response" );
+		equal( results.crossDomainEcma, "success, not executed", "cross-domain application/ecmascript response" );
+		equal( results.crossDomainProtocolLess, "success, not executed", "protocol-relative cross-domain response" );
+		equal( results.crossDomainGet, "success, not executed", "cross-domain jQuery.get() response" );
+		equal( results.crossDomainPost, "success, not executed", "cross-domain jQuery.post() response" );
+		equal( results.crossDomainOption, "success, not executed", "crossDomain: true response" );
+		equal( results.crossDomainDataType, "success, executed", "cross-domain response with an explicit script dataType" );
+		equal( results.sameDomain, "success, executed", "same-domain response" );
+		equal( results.sameDomainAbsolute, "success, executed", "absolute same-domain response" );
+	});
+
 	ajaxTest( "jQuery.ajax() - success callbacks (late binding)", 8, {
 		setup: addGlobalEvents("ajaxStart ajaxStop ajaxSend ajaxComplete ajaxSuccess"),
 		url: url("data/name.html"),
