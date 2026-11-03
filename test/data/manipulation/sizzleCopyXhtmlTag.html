@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+	<title>Bundled jQuery 1.9.1 (src/sizzle/test/jquery.js): XHTML-style self-closing tags are not expanded (CVE-2020-11022)</title>
+	<script src="../../../src/sizzle/test/jquery.js"></script>
+</head>
+<body>
+	<script>
+		window.xss = function() {};
+
+		// Cure53 payloads: once rxhtmlTag rewrites "<x/>" to "<x></x>" the raw-text
+		// element closes early and the <img> becomes a real element
+		var payloads = [
+				"<style><style/><img src=url404 onerror=xss(2)>",
+				"<xmp><xmp/><img src=url404 onerror=xss(3)>",
+				"<title><title /><img src=url404 onerror=xss(4)>",
+				"<noscript/><img src=url404 onerror=xss(10)>"
+			],
+			htmlImgs = [],
+			appendImgs = [],
+			div, i;
+
+		for ( i = 0; i < payloads.length; i++ ) {
+			htmlImgs.push( jQuery( "<div></div>" ).html( payloads[ i ] ).find( "img" ).length );
+			appendImgs.push( jQuery( "<div></div>" ).append( payloads[ i ] ).find( "img" ).length );
+		}
+
+		div = jQuery( "<div></div>" ).html( "<div/><div/>" );
+
+		window.parent.iframeCallback({
+			version: jQuery.fn.jquery,
+			htmlChildren: div.children().length,
+			htmlGrandchildren: div.children().children().length,
+			topLevel: jQuery( "<div/><div/>" ).length,
+			htmlImgs: htmlImgs.join( "," ),
+			appendImgs: appendImgs.join( "," )
+		});
+	</script>
+</body>
+</html>
