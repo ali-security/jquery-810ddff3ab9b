@@ -1,3 +1,66 @@
 language: node_js
-node_js:
-- '0.10'
+dist: focal
+# Every job's after_script waits for Travis to archive that job's log up to its
+# result lines (test/seal-wait-for-log.sh), so a harvest at build end is complete.
+jobs:
+  include:
+    # Upstream leg (`npm test` = grunt lint + build) on the release-era Node
+    # lines: 1.11.3 was published with node 0.12.2 / npm 2.7.4.
+    - name: "grunt lint+build (node 0.12)"
+      node_js: '0.12'
+      after_script: sh test/seal-wait-for-log.sh grunt
+    - name: "grunt lint+build (node 0.10)"
+      node_js: '0.10'
+      after_script: sh test/seal-wait-for-log.sh grunt
+    # The project's real QUnit unit suite (upstream ran it in browsers via
+    # TestSwarm), served by PHP for the ajax fixtures, in headless Chrome.
+    - name: "QUnit suite (headless Chrome)"
+      node_js: '20'
+      addons:
+        # Installed only for the shared libraries Chrome needs; the suite runs
+        # on the pinned Chrome for Testing build installed below.
+        chrome: stable
+        apt:
+          packages:
+            - php-cli
+      install:
+        - nvm install 0.12
+        - nvm use 0.12
+        - node --version
+        - npm --version
+        # Quiet install: the spinner/deprecation flood cut this job's Travis log short.
+        - npm install --spin=false --loglevel=error
+        - ./node_modules/.bin/grunt
+        - nvm use 20
+        - mkdir -p /tmp/driver
+        - (cd /tmp/driver && npm init -y && npm install --no-progress --loglevel=error puppeteer-core@22)
+        # Pin Chrome: from Chrome 154 on, setAttribute("onfocusin", ...) in
+        # jQuery 1.11's event support detection files a CSP script-src-attr
+        # report, failing "support: Check CSP ... restrictions"; 153 does not.
+        - npx -y @puppeteer/browsers@2 install chrome@153.0.8010.52 --path /tmp/cft
+      before_script:
+        - export CHROME_PATH=/tmp/cft/chrome/linux-153.0.8010.52/chrome-linux64/chrome
+        # Chrome for Testing ships without field trials, so the unload-handler
+        # deprecation is on by default there (branded Chrome keeps unload);
+        # "data: Triggering the removeData ... (#10080)" waits for an iframe unload.
+        - export CHROME_ARGS="--disable-features=DeprecateUnload,DeprecateUnloadByAllowList"
+        - $CHROME_PATH --version
+        - php --version
+        # Multiple workers are load-bearing: single-process php -S starves
+        # the fixture iframes the suite opens.
+        - (PHP_CLI_SERVER_WORKERS=10 php -S 127.0.0.1:8000 -t . > /tmp/php.log 2>&1 &)
+        - for i in $(seq 1 30); do curl -sf http://127.0.0.1:8000/test/index.html > /dev/null && break; sleep 1; done
+        - curl -sf http://127.0.0.1:8000/test/index.html > /dev/null
+      script:
+        # Environment-dependent in modern headless Chrome (not jQuery bugs);
+        # the runner prints each reason next to the skip in its summary.
+        - >-
+          SEAL_SKIP_TESTS="ajax: #14379 - jQuery.ajax() on unload||offset: fractions (see #7730 and #7885)"
+          SEAL_SKIP_REASONS="environment-dependent - Chrome (since v80) forbids synchronous XHR during page unload, so the request the test waits for never reaches the server; not a jQuery defect||environment-dependent - Blink snaps layout offsets to 1/64 px, so a fractional offset of 1000 reads back as 999.984375; the assertion predates that rendering behaviour"
+          NODE_PATH=/tmp/driver/node_modules
+          node test/seal-browser-runner.js "http://127.0.0.1:8000/test/index.html?dev"
+      after_failure:
+        - tail -n 100 /tmp/php.log
+      # Travis archives log parts minutes behind the job; hold the job open
+      # until its own archived log contains the QUnit summary.
+      after_script: sh test/seal-wait-for-log.sh qunit
