@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+	<title>Bundled jQuery 1.9.1 (src/sizzle/test/jquery.js): jQuery.extend( true, ... ) does not pollute Object.prototype (CVE-2019-11358)</title>
+	<script src="../../../src/sizzle/test/jquery.js"></script>
+</head>
+<body>
+	<script>
+		function polluted( extend, payload ) {
+			var result;
+
+			extend( JSON.parse( payload ) );
+			result = "devMode" in {};
+
+			// Clean up so the next check starts from a pristine Object.prototype
+			delete Object.prototype.devMode;
+			return result;
+		}
+
+		var merged = jQuery.extend( true, {}, { a: { b: 1 } }, { a: { c: 2 } } );
+
+		window.parent.iframeCallback({
+			version: jQuery.fn.jquery,
+			polluted: polluted( function( obj ) {
+				jQuery.extend( true, {}, obj );
+			}, "{\"__proto__\": {\"devMode\": true}}" ),
+			nestedPolluted: polluted( function( obj ) {
+				jQuery.extend( true, {}, obj );
+			}, "{\"a\": {\"__proto__\": {\"devMode\": true}}}" ),
+			fnPolluted: polluted( function( obj ) {
+				jQuery.fn.extend.call( {}, true, {}, obj );
+			}, "{\"__proto__\": {\"devMode\": true}}" ),
+			deepMerge: merged.a.b === 1 && merged.a.c === 2
+		});
+	</script>
+</body>
+</html>

@@ -1098,6 +1098,31 @@ test("jQuery.extend(Object, Object)", function() {
 	deepEqual( options2, options2Copy, "Check if not modified: options2 must not be modified" );
 });
 
+test( "jQuery.extend( true, ... ) Object.prototype pollution", function() {
+	expect( 1 );
+
+	jQuery.extend( true, {}, JSON.parse( "{\"__proto__\": {\"devMode\": true}}" ) );
+	ok( !( "devMode" in {} ), "Object.prototype not polluted" );
+} );
+
+test( "jQuery.extend( true, ... ) Object.prototype pollution - nested __proto__", function() {
+	expect( 1 );
+
+	jQuery.extend( true, {}, JSON.parse( "{\"a\": {\"__proto__\": {\"devMode\": true}}}" ) );
+	ok( !( "devMode" in {} ), "Object.prototype not polluted" );
+} );
+
+// src/sizzle/test/jquery.js is a full jQuery 1.9.1 build shipped in the package
+testIframeWithCallback( "jQuery.extend( true, ... ) Object.prototype pollution in the bundled jQuery 1.9.1 copy (src/sizzle/test/jquery.js)", "core/sizzleCopyProtoPollution.html", function( result ) {
+	expect( 5 );
+
+	strictEqual( result.version, "1.9.1", "the iframe ran the bundled jQuery 1.9.1 copy" );
+	strictEqual( result.polluted, false, "Object.prototype not polluted" );
+	strictEqual( result.nestedPolluted, false, "Object.prototype not polluted by a nested __proto__" );
+	strictEqual( result.fnPolluted, false, "Object.prototype not polluted through jQuery.fn.extend" );
+	strictEqual( result.deepMerge, true, "deep extend still merges nested objects" );
+});
+
 test("jQuery.each(Object,Function)", function() {
 	expect( 23 );
 
