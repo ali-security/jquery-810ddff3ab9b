@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+	<title>Bundled jQuery 1.9.1 (src/sizzle/test/jquery.js): jQuery.parseHTML doesn't run inline event handlers (sonatype-2014-0026)</title>
+	<script src="../../../src/sizzle/test/jquery.js"></script>
+</head>
+<body>
+	<script>
+		// Context-less calls must neither parse in the live document
+		// nor run the inline event handler
+		var calls = [
+				[ "jQuery.parseHTML( html )", function( html ) {
+					return jQuery.parseHTML( html );
+				} ],
+				[ "jQuery.parseHTML( html, true )", function( html ) {
+					return jQuery.parseHTML( html, true );
+				} ],
+				[ "jQuery.parseHTML( html, null, true )", function( html ) {
+					return jQuery.parseHTML( html, null, true );
+				} ]
+			],
+			result = {
+				version: jQuery.fn.jquery,
+				supportCreateHTMLDocument: jQuery.support.createHTMLDocument,
+				liveOwner: [],
+				executed: [],
+				controlFired: false
+			},
+			i, nodes;
+
+		function payload( index ) {
+			return "<img src=url404 onerror=xss(" + index + ")>";
+		}
+
+		window.xss = function( index ) {
+			if ( index === calls.length ) {
+				result.controlFired = true;
+			} else {
+				result.executed.push( calls[ index ][ 0 ] );
+			}
+		};
+
+		for ( i = 0; i < calls.length; i++ ) {
+			nodes = calls[ i ][ 1 ]( payload( i ) );
+			if ( nodes[ 0 ].ownerDocument === document ) {
+				result.liveOwner.push( calls[ i ][ 0 ] );
+			}
+		}
+
+		// Control: an explicit live-document context still parses in that
+		// document (as jQuery( html ) does), so the handler does fire there.
+		// This proves the payload is live in this browser.
+		jQuery.parseHTML( payload( calls.length ), document );
+
+		// Parsed URLs still resolve against the page URL (gh-2965)
+		result.anchorHref = jQuery.parseHTML( "<a href='test.html'></a>" )[ 0 ].href;
+
+		// Parsed nodes still work once inserted into the page
+		nodes = jQuery.parseHTML( "<div class='parsed'><b>bold</b></div>" );
+		jQuery( "<div></div>" ).append( nodes ).appendTo( document.body );
+		result.insertedText = jQuery( "div.parsed b" ).text();
+
+		nodes = jQuery.parseHTML( "<span></span>" );
+		result.singleTag = nodes[ 0 ].nodeName.toLowerCase();
+		result.singleTagLive = nodes[ 0 ].ownerDocument === document;
+		result.explicitContextOwner = jQuery.parseHTML( "<i>x</i>", document )[ 0 ].ownerDocument === document;
+
+		// Give the url404 images time to fail and fire any injected onerror handler
+		setTimeout(function() {
+			window.parent.iframeCallback( result );
+		}, 1500 );
+	</script>
+</body>
+</html>

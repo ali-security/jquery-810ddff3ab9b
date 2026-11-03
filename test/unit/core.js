@@ -1382,6 +1382,74 @@ test("jQuery.parseHTML", function() {
 	equal( jQuery.parseHTML("<td><td>")[ 1 ].parentNode.nodeType, 11, "parentNode should be documentFragment" );
 });
 
+test( "jQuery.parseHTML(<a href>) - gh-2965", function() {
+	expect( 1 );
+
+	var html = "<a href='test.html'></a>",
+		href = jQuery.parseHTML( html )[ 0 ].href;
+
+	ok( /\/test\.html$/.test( href ), "href is not lost after parsing anchor" );
+});
+
+if ( jQuery.support.createHTMLDocument ) {
+	asyncTest("jQuery.parseHTML", function() {
+		expect ( 1 );
+
+		Globals.register("parseHTMLError");
+
+		jQuery.globalEval("parseHTMLError = false;");
+		jQuery.parseHTML( "<img src=x onerror='parseHTMLError = true'>" );
+
+		window.setTimeout(function() {
+			start();
+			equal( window.parseHTMLError, false, "onerror eventhandler has not been called." );
+		}, 2000);
+	});
+
+	asyncTest( "jQuery.parseHTML(html, keepScripts) doesn't run inline event handlers (sonatype-2014-0026)", function() {
+		expect( 1 );
+
+		Globals.register("parseHTMLKeepScriptsError");
+
+		jQuery.globalEval("parseHTMLKeepScriptsError = false;");
+		jQuery.parseHTML( "<img src=x onerror='parseHTMLKeepScriptsError = true'>", true );
+		jQuery.parseHTML( "<img src=y onerror='parseHTMLKeepScriptsError = true'>", null, true );
+
+		window.setTimeout(function() {
+			start();
+			equal( window.parseHTMLKeepScriptsError, false, "onerror eventhandler has not been called." );
+		}, 2000);
+	});
+
+	test( "jQuery.parseHTML parses into an inert document unless given a context (sonatype-2014-0026)", function() {
+		expect( 5 );
+
+		var html = "<img src=x>";
+
+		notStrictEqual( jQuery.parseHTML( html )[ 0 ].ownerDocument, document, "jQuery.parseHTML( html ) doesn't parse in the live document" );
+		notStrictEqual( jQuery.parseHTML( html, true )[ 0 ].ownerDocument, document, "jQuery.parseHTML( html, true ) doesn't parse in the live document" );
+		notStrictEqual( jQuery.parseHTML( html, null, true )[ 0 ].ownerDocument, document, "jQuery.parseHTML( html, null, true ) doesn't parse in the live document" );
+		notStrictEqual( jQuery.parseHTML( "<span></span>" )[ 0 ].ownerDocument, document, "single tags aren't created in the live document" );
+		strictEqual( jQuery.parseHTML( "<i>x</i>", document )[ 0 ].ownerDocument, document, "an explicit context is still used" );
+	});
+
+	// src/sizzle/test/jquery.js is a full jQuery 1.9.1 build shipped in the package
+	testIframeWithCallback( "jQuery.parseHTML doesn't run inline event handlers in the bundled jQuery 1.9.1 copy (src/sizzle/test/jquery.js) (sonatype-2014-0026)", "core/sizzleCopyParseHTML.html", function( result ) {
+		expect( 10 );
+
+		strictEqual( result.version, "1.9.1", "the iframe ran the bundled jQuery 1.9.1 copy" );
+		strictEqual( result.supportCreateHTMLDocument, true, "jQuery.support.createHTMLDocument" );
+		deepEqual( result.liveOwner, [], "context-less jQuery.parseHTML didn't parse in the live document" );
+		deepEqual( result.executed, [], "context-less jQuery.parseHTML ran no inline event handler" );
+		strictEqual( result.controlFired, true, "the same markup parsed with an explicit document context does run it (control)" );
+		ok( /\/test\.html$/.test( result.anchorHref ), "href is not lost after parsing anchor (gh-2965)" );
+		strictEqual( result.insertedText, "bold", "parsed nodes can be inserted into the page" );
+		strictEqual( result.singleTag, "span", "single tags are still parsed" );
+		strictEqual( result.singleTagLive, false, "single tags aren't created in the live document" );
+		strictEqual( result.explicitContextOwner, true, "an explicit context is still used" );
+	});
+}
+
 test("jQuery.parseJSON", function() {
 	expect( 20 );
 
